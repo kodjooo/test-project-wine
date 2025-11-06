@@ -39,15 +39,15 @@
 ```json
 {
   "image": {
-    "url": "https://iili.io/xxxxxx.jpg",           // IMAGE_DIRECT_URL
-    "url_viewer": "https://freeimage.host/xxxxxx", // IMAGE_VIEWER_URL
+    "url": "https://iili.io/xxxxxx.jpg",
+    "url_viewer": "https://freeimage.host/xxxxxx",
     "thumb": { "url": "https://iili.io/xxxxxt.jpg" }
   },
   "success": { "code": 200 }
 }
 ```
 
-- В таблицу записываются `IMAGE_DIRECT_URL`, `IMAGE_VIEWER_URL`, `IMAGE_THUMB_URL`, `IMAGE_SHA256`, а формула `IMAGE_CELL` имеет вид `=IMAGE(IMAGE_DIRECT_URL)`.
+- В таблицу записывается только `IMAGE_DIRECT_URL`; столбец `IMAGE_CELL` содержит `=IMAGE(IMAGE_DIRECT_URL)` для предпросмотра.
 - Кеш по SHA‑256 позволяет не загружать повторно одинаковые изображения; при повторном запуске сохраняется прежний direct URL.
 
 ## Сборка и запуск (Docker Desktop)

@@ -102,9 +102,9 @@ config.json (пример — при необходимости подправи
 
 5) Поля для Google Sheets (лист GSHEET_TAB)
 PRODUCT_URL, TITLE, PRICE_VALUE,
-COUNTRY, VOLUME_L, ABV_PERCENT, AGE_YEARS, BRAND, PRODUCER,
+POSITION, COUNTRY, VOLUME_L, ABV_PERCENT, AGE_YEARS, BRAND, PRODUCER,
 TASTING_NOTES, GASTRONOMY, GRAPES_JSON, MATURATION, GIFT_PACKAGING,
-IMAGE_ORIGINAL_URL, IMAGE_DIRECT_URL, IMAGE_VIEWER_URL, IMAGE_THUMB_URL, IMAGE_SHA256, IMAGE_CELL, STATUS, ERROR_MSG.
+IMAGE_DIRECT_URL, IMAGE_CELL, STATUS, ERROR_MSG.
 
 Правила:
 — GRAPES_JSON: массив строк (JSON), например ["Уни Блан","Коломбар"].
@@ -118,7 +118,8 @@ IMAGE_ORIGINAL_URL, IMAGE_DIRECT_URL, IMAGE_VIEWER_URL, IMAGE_THUMB_URL, IMAGE_S
    3.2. Спарсить: TITLE, SKU (регекс «Артикул: (.+)»), COUNTRY (ссылка около заголовка/хлебные крошки), VOLUME_L/ABV_PERCENT (по селекторам или LLM из «инфо‑плашки»), PRICE_VALUE/PRICE_CURRENCY, AVAILABILITY («в наличии» → true), BRAND/PRODUCER (блок «Производитель» и/или ссылочные элементы рядом с h1), AGE_YEARS (эвристика/LLM по заголовку или «Способ выдержки»), разделы (tasting_notes, gastronomy, grapes → список, maturation, awards, gift_packaging).
    3.3. Найти главное изображение: image_selector → первая подходящая <img>. Получить абсолютный URL (учесть data-src/srcset). При необходимости скачать и посчитать SHA‑256; если уже есть такой хэш — переиспользовать прежние ссылки FreeImage.host.
    3.4. Загрузить изображение на FreeImage.host (сначала передав исходный URL, при ошибке — бинарный файл) и получить прямую ссылку.
-   3.5. Подготовить запись для Sheets. Upsert по PRODUCT_URL. IMAGE_CELL = =IMAGE(IMAGE_DIRECT_URL). STATUS = new | updated.
+   3.5. Подготовить запись для Sheets. Upsert по PRODUCT_URL. Сохранять глобальную позицию карточки в колонке POSITION. IMAGE_CELL = =IMAGE(IMAGE_DIRECT_URL). STATUS = new | updated.
+   3.6. Перед стартом обхода считать из таблицы максимальную POSITION и продолжить со следующей.
 4. Пагинация: находить ссылки на страницы (page_link_selector). Для текущей страницы определить «следующую» как ближайшее число > текущего; если нет — завершить.
 5. Итог: вывести отчёт (pages, products_total, inserted, updated, errors).
 

@@ -39,7 +39,7 @@ def test_parse_html_extracts_core_fields() -> None:
     assert product.price_value == 9999.0
     assert product.price_currency == "RUB"
     assert product.availability_text == "Товар в наличии"
-    assert product.hero_image_url.endswith("/upload/sample/sample.jpg")
+    assert product.hero_image_url.endswith("/upload/sample/sample@2048.jpg")
     assert product.producer == "Sample Producer"
     assert product.grapes == ["Уни Блан", "Фоль Бланш", "Коломбар"]
 

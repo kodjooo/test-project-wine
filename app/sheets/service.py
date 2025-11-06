@@ -24,6 +24,7 @@ SHEETS_SCOPES = [
 
 SHEET_COLUMNS: List[str] = [
     "PRODUCT_URL",
+    "POSITION",
     "TITLE",
     "PRICE_VALUE",
     "COUNTRY",
@@ -37,11 +38,7 @@ SHEET_COLUMNS: List[str] = [
     "GRAPES_JSON",
     "MATURATION",
     "GIFT_PACKAGING",
-    "IMAGE_ORIGINAL_URL",
     "IMAGE_DIRECT_URL",
-    "IMAGE_VIEWER_URL",
-    "IMAGE_THUMB_URL",
-    "IMAGE_SHA256",
     "IMAGE_CELL",
     "STATUS",
     "ERROR_MSG",
@@ -126,6 +123,7 @@ class SheetsWriter:
         self,
         *,
         product_url: str,
+        position: int,
         title: Optional[str],
         price_value: Optional[float],
         country: Optional[str],
@@ -139,17 +137,14 @@ class SheetsWriter:
         grapes: List[str],
         maturation: Optional[str],
         gift_packaging: Optional[str],
-        image_original_url: Optional[str],
         image_direct_url: Optional[str],
-        image_viewer_url: Optional[str],
-        image_thumb_url: Optional[str],
-        image_sha256: Optional[str],
         status: str,
         error_msg: Optional[str] = None,
     ) -> SheetRecord:
         """Подготовить запись для Google Sheets."""
         values: Dict[str, Optional[str]] = {
             "PRODUCT_URL": product_url,
+            "POSITION": str(position),
             "TITLE": title or "",
             "PRICE_VALUE": self._format_number(price_value),
             "COUNTRY": country or "",
@@ -163,16 +158,46 @@ class SheetsWriter:
             "GRAPES_JSON": json.dumps(grapes, ensure_ascii=False),
             "MATURATION": maturation or "",
             "GIFT_PACKAGING": gift_packaging or "",
-            "IMAGE_ORIGINAL_URL": image_original_url or "",
             "IMAGE_DIRECT_URL": image_direct_url or "",
-            "IMAGE_VIEWER_URL": image_viewer_url or "",
-            "IMAGE_THUMB_URL": image_thumb_url or "",
-            "IMAGE_SHA256": image_sha256 or "",
             "IMAGE_CELL": f"=IMAGE(\"{image_direct_url}\")" if image_direct_url else "",
             "STATUS": status,
             "ERROR_MSG": error_msg or "",
         }
         return SheetRecord(unique_key=product_url, values=values)
+
+    async def get_last_position(self) -> int:
+        """Получить максимальную позицию товара из таблицы (для продолжения обработки)."""
+        if not self._enabled:
+            self._logger.info("Sheets отключён — продолжаем с первой позиции.")
+            return 0
+        worksheet = await self._get_worksheet()
+        if worksheet is None:
+            self._logger.warning("Worksheet недоступен, продолжаем с первой позиции.")
+            return 0
+        await asyncio.to_thread(self._ensure_header, worksheet)
+        try:
+            col_idx = SHEET_COLUMNS.index("POSITION") + 1
+            column_values = await asyncio.to_thread(
+                worksheet.col_values, col_idx
+            )
+        except gspread.exceptions.APIError as exc:
+            self._logger.warning(
+                "Не удалось получить колонку POSITION из Sheets: %s", exc
+            )
+            return 0
+
+        max_position = 0
+        for value in column_values[1:]:
+            if not value:
+                continue
+            try:
+                position = int(value)
+            except ValueError:
+                continue
+            if position > max_position:
+                max_position = position
+        self._logger.info("Последняя обработанная позиция в Sheets: %s", max_position)
+        return max_position
 
     def _ensure_header(self, worksheet) -> None:
         current_header = worksheet.row_values(1)

@@ -38,6 +38,12 @@ async def run() -> List[ProductNormalized]:
     inserted = 0
     updated = 0
     skipped = 0
+    last_position = await sheets_writer.get_last_position()
+    current_position = 0
+    LOGGER.info(
+        "Продолжаем обработку с позиции %s",
+        last_position + 1,
+    )
 
     async with _launch_browser(settings) as context:
         try:
@@ -48,11 +54,19 @@ async def run() -> List[ProductNormalized]:
                     len(category_page.product_links),
                 )
                 for product_link in category_page.product_links:
+                    current_position += 1
+                    if current_position <= last_position:
+                        LOGGER.info(
+                            "Пропуск карточки %s (позиция %s уже обработана)",
+                            product_link.url,
+                            current_position,
+                        )
+                        continue
                     LOGGER.info(
                         "Начата обработка карточки: %s (страница %s, позиция %s)",
                         product_link.url,
                         product_link.page_number,
-                        product_link.position,
+                        current_position,
                     )
                     product = await parser.parse(context, product_link)
                     LOGGER.info("Парсинг завершён: %s", product.product_url)
@@ -149,11 +163,8 @@ async def run() -> List[ProductNormalized]:
                             grapes=normalized.grapes,
                             maturation=normalized.maturation,
                             gift_packaging=normalized.gift_packaging,
-                            image_original_url=normalized.hero_image_url,
+                            position=current_position,
                             image_direct_url=image_direct_url,
-                            image_viewer_url=image_viewer_url,
-                            image_thumb_url=image_thumb_url,
-                            image_sha256=image_sha,
                             status=target_status,
                             error_msg=media_error,
                         )

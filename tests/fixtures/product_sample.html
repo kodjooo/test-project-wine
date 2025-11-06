@@ -20,9 +20,14 @@
 
     <div class="product__content content">
         <div class="product__content-img">
-            <img src="/upload/sample/sample.jpg"
-                 srcset="/upload/sample/sample@2x.jpg 2x, /upload/sample/sample@3x.jpg 3x"
-                 alt="Sample XO">
+            <picture class="product__image">
+                <source media="(min-width: 1280px)"
+                        srcset="/upload/sample/sample@1024.jpg 1x, /upload/sample/sample@2048.jpg 2x">
+                <source srcset="/upload/sample/sample@768.jpg 1x, /upload/sample/sample@1536.jpg 2x">
+                <img src="/upload/sample/sample.jpg"
+                     srcset="/upload/sample/sample@2x.jpg 2x, /upload/sample/sample@3x.jpg 3x"
+                     alt="Sample XO">
+            </picture>
         </div>
         <div class="product__content-desc">
             <div class="product__content-desc-wrapper">

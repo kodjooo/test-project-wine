@@ -37,7 +37,13 @@ SECTION_KEYS = {
     "подарочная упаковка": "gift_packaging",
 }
 
-IMAGE_SELECTOR = ".product__content-img img, .product__gallery img, img[src*='/upload/']"
+IMAGE_SELECTOR = (
+    ".product__content-img img, "
+    ".product__content-img source, "
+    ".product__gallery img, "
+    ".product__gallery source, "
+    "img[src*='/upload/']"
+)
 
 
 @dataclass(slots=True)
@@ -217,28 +223,57 @@ class ProductPageParser:
         return clean_text(section.text)
 
     def _extract_images(self, tree: HTMLParser, base_url: str) -> List[str]:
-        urls: List[str] = []
+        weighted: Dict[str, float] = {}
         for node in tree.css(IMAGE_SELECTOR):
             src = node.attributes.get("src")
             if src:
                 absolute = urljoin(base_url, src)
-                if absolute not in urls:
-                    urls.append(absolute)
+                self._register_image(weighted, absolute, weight=1.0)
             srcset = node.attributes.get("srcset")
             if srcset:
-                for candidate in self._parse_srcset(srcset):
+                for candidate, descriptor in self._parse_srcset(srcset):
                     absolute = urljoin(base_url, candidate)
-                    if absolute not in urls:
-                        urls.append(absolute)
-        return urls
+                    weight = self._descriptor_weight(descriptor)
+                    self._register_image(weighted, absolute, weight=weight)
+        sorted_urls = [
+            url
+            for url, _ in sorted(
+                weighted.items(),
+                key=lambda item: item[1],
+                reverse=True,
+            )
+        ]
+        return sorted_urls
 
-    def _parse_srcset(self, srcset: str) -> List[str]:
-        candidates = []
+    def _register_image(self, registry: Dict[str, float], url: str, weight: float) -> None:
+        current = registry.get(url)
+        if current is None or weight > current:
+            registry[url] = weight
+
+    def _parse_srcset(self, srcset: str) -> List[tuple[str, str]]:
+        candidates: List[tuple[str, str]] = []
         for chunk in srcset.split(","):
-            part = chunk.strip().split(" ")[0]
-            if part:
-                candidates.append(part)
+            parts = chunk.strip().split()
+            if not parts:
+                continue
+            url = parts[0]
+            descriptor = parts[1] if len(parts) > 1 else ""
+            candidates.append((url, descriptor))
         return candidates
+
+    def _descriptor_weight(self, descriptor: str) -> float:
+        descriptor = descriptor.strip()
+        if descriptor.endswith("w"):
+            try:
+                return float(descriptor[:-1])
+            except ValueError:
+                return 1.0
+        if descriptor.endswith("x"):
+            try:
+                return float(descriptor[:-1]) * 1000
+            except ValueError:
+                return 1.0
+        return 1.0
 
     def _match_section_key(self, normalized_title: str) -> Optional[str]:
         for pattern, key in SECTION_KEYS.items():
