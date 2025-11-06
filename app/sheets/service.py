@@ -11,7 +11,7 @@ from typing import Dict, List, Optional
 import gspread
 from google.oauth2 import service_account
 from gspread.exceptions import WorksheetNotFound
-from gspread.utils import col_to_letter, rowcol_to_a1
+from gspread.utils import rowcol_to_a1
 import logging
 
 from app.config import Settings
@@ -46,6 +46,17 @@ SHEET_COLUMNS: List[str] = [
     "STATUS",
     "ERROR_MSG",
 ]
+
+
+def _column_letter(index: int) -> str:
+    """Преобразовать индекс колонки (1-based) в буквенное представление A..Z."""
+    if index < 1:
+        raise ValueError("Column index должен быть >= 1")
+    result = []
+    while index:
+        index, remainder = divmod(index - 1, 26)
+        result.append(chr(65 + remainder))
+    return "".join(reversed(result))
 
 
 @dataclass(slots=True)
@@ -170,7 +181,7 @@ class SheetsWriter:
         if current_header:
             # Дополним существующими колонками, чтобы не потерять данные.
             worksheet.update(
-                f"A1:{col_to_letter(len(SHEET_COLUMNS))}1",
+                f"A1:{_column_letter(len(SHEET_COLUMNS))}1",
                 [SHEET_COLUMNS],
                 value_input_option="RAW",
             )
