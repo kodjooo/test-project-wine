@@ -1,0 +1,10 @@
+services:
+  scraper:
+    build: .
+    image: test-project-wine:latest
+    command: ["python", "-m", "app.main"]
+    env_file: .env
+    volumes:
+      - ./state:/app/state
+      - ./secrets:/secrets:ro
+    restart: "no"

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <title>Sample Product</title>
+</head>
+<body>
+<div class="ui-breadcrumbs content">
+    <a class="ui-breadcrumbs__item" href="/">Главная</a>
+    <a class="ui-breadcrumbs__item" href="/katalog/">Каталог</a>
+    <span class="ui-breadcrumbs__item">Карточка</span>
+</div>
+
+<div class="product">
+    <div class="product__header content">
+        <h1 class="product__name">Коньяк SAMPLE XO</h1>
+        <div class="product__id">Артикул: SAMPLE-001</div>
+        <button class="favorites product__favorite" data-product-id="SAMPLE-001"></button>
+    </div>
+
+    <div class="product__content content">
+        <div class="product__content-img">
+            <img src="/upload/sample/sample.jpg"
+                 srcset="/upload/sample/sample@2x.jpg 2x, /upload/sample/sample@3x.jpg 3x"
+                 alt="Sample XO">
+        </div>
+        <div class="product__content-desc">
+            <div class="product__content-desc-wrapper">
+                <div class="product__titles">
+                    <div class="product__titles-name">Sample Brand</div>
+                    <div class="product__titles-region">
+                        <a href="/katalog/krepkie_napitki/filtr/strana-frantsiya/">Франция</a>,
+                        <a href="/katalog/krepkie_napitki/filtr/region-konyak/">Коньяк</a>
+                    </div>
+                </div>
+                <div class="product__content-body">
+                    <div class="product__facts">
+                        <div class="product__facts-item">0.7 л</div>
+                        <div class="product__facts-item">40 %</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="ui-tabs__content content" data-group-id="product-tabs">
+        <div class="ui-tabs__item ui-tabs__item_show product__specifications" data-tab-id="specifications">
+            <article>
+                <h4>Дегустационные характеристики:</h4>
+                <p>Яркий аромат ванили и сухофруктов, сбалансированный вкус.</p>
+
+                <h4>Сортовой состав:</h4>
+                <p>Уни Блан<br>Фоль Бланш<br>Коломбар</p>
+
+                <h4>Способ выдержки:</h4>
+                <p>Выдержка не менее 5 лет в дубовых бочках.</p>
+
+                <h4>Награды и оценки товара:</h4>
+                <p>IWSC 2022 — Gold</p>
+            </article>
+            <aside>
+                <h4>Производитель:</h4>
+                <p><a href="#">Sample Producer</a></p>
+
+                <h4>Подарочная упаковка:</h4>
+                <p>Фирменная коробка</p>
+            </aside>
+        </div>
+    </div>
+
+    <div class="product__buy-box">
+        <div class="product__buy-box-wrapper">
+            <div class="product__buy-box-money">
+                <div class="product__buy-box-money-wrapper">
+                    <div class="product__buy-box-price">9&nbsp;999 руб.</div>
+                </div>
+            </div>
+            <div class="product__buy-box-footer">
+                Товар в наличии
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>
