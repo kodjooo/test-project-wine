@@ -70,13 +70,52 @@ docker compose run --rm scraper pytest
 ## Развёртывание на сервере
 
 1. Установите Docker и Docker Compose.
-2. Склонируйте репозиторий, заполните `.env`, копируйте секреты и API-ключ FreeImage.host.
-3. Запустите:
+### Развёртывание на удалённом сервере
+
+1. **Подготовьте хост.**
+   - Установите Docker и Docker Compose (или Docker Compose V2, входящий в Docker CLI).
+   - Откройте исходящие HTTPS-подключения (для сайта-источника, FreeImage.host и Google APIs).
+   - Создайте системного пользователя, от которого будет запускаться пайплайн; убедитесь, что у него есть права на Docker.
+
+2. **Склонируйте репозиторий и подготовьте конфигурацию.**
    ```bash
-   docker compose pull   # если используете опубликованный образ, иначе build
+   git clone git@github.com:kodjooo/test-project-wine.git
+   cd test-project-wine
+   cp .env.example .env
+   ```
+   Заполните `.env`:
+   - `CATEGORY_URL` — актуальный URL категории.
+   - `GSHEET_ID`, `GSHEET_TAB`, `GOOGLE_SA_JSON` — доступ к Google Sheets.
+   - `FREEIMAGE_API_KEY` — ключ FreeImage.host; при необходимости измените таймауты/endpoint.
+   - При использовании прокси заполните `USE_PROXY` и URL.
+
+3. **Разместите секреты.**
+   ```bash
+   mkdir -p secrets state
+   scp ./local/path/google-credentials.json user@server:/path/to/test-project-wine/secrets/sa.json
+   ```
+   (Имя файла в `.env` должно совпадать с фактическим.)
+
+4. **Соберите и запустите контейнер.**
+   ```bash
+   docker compose build            # либо docker compose pull, если образ публикуется отдельно
    docker compose up -d scraper
    ```
-4. Логи смотреть через `docker compose logs -f scraper`.
+   При первом запуске Playwright скачает браузеры; дождитесь завершения.
+
+5. **Контроль и обслуживание.**
+   - Просмотр логов: `docker compose logs -f scraper`.
+   - Остановка пайплайна: `docker compose down`.
+   - Плановые обновления: `git pull && docker compose build && docker compose up -d`.
+   - Ротация state: каталог `state/` смонтирован как volume, включите его в резервное копирование.
+
+6. **Мониторинг/трекинг ошибок.**
+   - В Google Sheets колонка `STATUS` покажет `error` при неудачной загрузке FreeImage — смотрите `ERROR_MSG`.
+   - В логах присутствуют счётчики `inserted/updated/skipped` и подробности по сетевым ошибкам.
+
+7. **Безопасность.**
+   - Убедитесь, что `.env` и `secrets/` недоступны извне (используйте `chmod 600` при необходимости).
+   - Разделите доступ к FreeImage.host-ключу и Google Sheets-аккаунту между ответственными лицами.
 
 ## Ключевые пути
 

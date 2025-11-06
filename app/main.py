@@ -48,8 +48,16 @@ async def run() -> List[ProductNormalized]:
                     len(category_page.product_links),
                 )
                 for product_link in category_page.product_links:
+                    LOGGER.info(
+                        "Начата обработка карточки: %s (страница %s, позиция %s)",
+                        product_link.url,
+                        product_link.page_number,
+                        product_link.position,
+                    )
                     product = await parser.parse(context, product_link)
+                    LOGGER.info("Парсинг завершён: %s", product.product_url)
                     normalized = await normalizer.normalize(product)
+                    LOGGER.info("Нормализация завершена: %s", normalized.product_url)
                     normalized_products.append(normalized)
 
                     etag_hash = product_etag(normalized)
@@ -68,10 +76,25 @@ async def run() -> List[ProductNormalized]:
                     media_error: Optional[str] = None
 
                     if need_update:
+                        LOGGER.info(
+                            "Карточка %s требует обновления (etag изменился или отсутствует)",
+                            normalized.product_url,
+                        )
                         try:
                             media_result = await media_uploader.ensure_image(normalized)
+                            LOGGER.info(
+                                "Обработка изображения завершена для %s: sha=%s, direct_url=%s",
+                                normalized.product_url,
+                                media_result.sha256,
+                                media_result.direct_url,
+                            )
                         except Exception as exc:
                             media_error = str(exc)
+                            LOGGER.exception(
+                                "Не удалось обработать изображение для %s: %s",
+                                normalized.product_url,
+                                exc,
+                            )
                             media_result = MediaUploadResult(
                                 sha256=None,
                                 direct_url=None,
@@ -112,27 +135,20 @@ async def run() -> List[ProductNormalized]:
                                 )
                             target_status = "error"
                         record = sheets_writer.build_record(
-                            product_id=product_id,
-                            category_url=settings.category_url,
-                            page_number=normalized.page_number,
                             product_url=normalized.product_url,
                             title=normalized.title,
                             price_value=normalized.price_value,
-                            price_currency=normalized.price_currency,
                             country=normalized.country,
                             volume_l=normalized.volume_l,
                             abv_percent=normalized.abv_percent,
                             age_years=normalized.age_years,
                             brand=normalized.brand,
                             producer=normalized.producer,
-                            sku=normalized.sku,
                             tasting_notes=normalized.tasting_notes,
                             gastronomy=normalized.gastronomy,
                             grapes=normalized.grapes,
                             maturation=normalized.maturation,
-                            awards=normalized.awards,
                             gift_packaging=normalized.gift_packaging,
-                            breadcrumbs=normalized.breadcrumbs,
                             image_original_url=normalized.hero_image_url,
                             image_direct_url=image_direct_url,
                             image_viewer_url=image_viewer_url,
@@ -142,6 +158,11 @@ async def run() -> List[ProductNormalized]:
                             error_msg=media_error,
                         )
                         status = await sheets_writer.upsert(record)
+                        LOGGER.info(
+                            "Запись в Google Sheets для %s завершена со статусом %s",
+                            normalized.product_url,
+                            status,
+                        )
                         if status == "new":
                             inserted += 1
                         elif status == "updated":
@@ -157,6 +178,7 @@ async def run() -> List[ProductNormalized]:
                         etag_hash=etag_hash,
                         image_sha256=image_sha,
                     )
+                    LOGGER.info("Сохранено состояние для %s", normalized.product_url)
         finally:
             await media_uploader.aclose()
             state.close()

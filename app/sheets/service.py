@@ -5,14 +5,14 @@ from __future__ import annotations
 import asyncio
 import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
 
 import gspread
 from google.oauth2 import service_account
 from gspread.exceptions import WorksheetNotFound
-from gspread.utils import rowcol_to_a1
+from gspread.utils import col_to_letter, rowcol_to_a1
+import logging
 
 from app.config import Settings
 from app.state import StateRepository
@@ -23,28 +23,20 @@ SHEETS_SCOPES = [
 ]
 
 SHEET_COLUMNS: List[str] = [
-    "TIMESTAMP_UTC",
-    "SOURCE_CATEGORY_URL",
-    "PAGE_NUM",
     "PRODUCT_URL",
-    "PRODUCT_ID",
     "TITLE",
     "PRICE_VALUE",
-    "PRICE_CURRENCY",
     "COUNTRY",
     "VOLUME_L",
     "ABV_PERCENT",
     "AGE_YEARS",
     "BRAND",
     "PRODUCER",
-    "SKU",
     "TASTING_NOTES",
     "GASTRONOMY",
     "GRAPES_JSON",
     "MATURATION",
-    "AWARDS",
     "GIFT_PACKAGING",
-    "BREADCRUMBS",
     "IMAGE_ORIGINAL_URL",
     "IMAGE_DIRECT_URL",
     "IMAGE_VIEWER_URL",
@@ -68,7 +60,7 @@ class SheetRecord:
 
 
 class SheetsWriter:
-    """Обновляет Google Sheets, выполняя upsert-записи по PRODUCT_ID."""
+    """Обновляет Google Sheets, выполняя upsert-записи по PRODUCT_URL."""
 
     def __init__(self, settings: Settings, state: StateRepository) -> None:
         self._settings = settings
@@ -76,14 +68,21 @@ class SheetsWriter:
         self._enabled = self._is_enabled()
         self._client: Optional[gspread.Client] = None
         self._worksheet = None
+        self._logger = logging.getLogger(__name__)
 
     async def upsert(self, record: SheetRecord) -> str:
         """Добавить или обновить строку и вернуть статус new/updated/skipped."""
         if not self._enabled:
+            self._logger.info(
+                "Пропуск записи в Sheets: сервис отключён или отсутствуют креды."
+            )
             return "skipped"
 
         worksheet = await self._get_worksheet()
         if worksheet is None:
+            self._logger.warning(
+                "Не удалось получить рабочий лист Google Sheets, запись пропущена."
+            )
             return "skipped"
 
         await asyncio.to_thread(self._ensure_header, worksheet)
@@ -97,6 +96,11 @@ class SheetsWriter:
             await asyncio.to_thread(
                 self._update_row, worksheet, existing_row, row_values
             )
+            self._logger.info(
+                "Строка Sheets обновлена (row=%s, key=%s)",
+                existing_row,
+                record.unique_key,
+            )
             return "updated"
 
         await asyncio.to_thread(
@@ -104,32 +108,26 @@ class SheetsWriter:
             row_values,
             value_input_option="USER_ENTERED",
         )
+        self._logger.info("Добавлена новая строка в Sheets (key=%s)", record.unique_key)
         return "new"
 
     def build_record(
         self,
         *,
-        product_id: str,
-        category_url: str,
-        page_number: Optional[int],
         product_url: str,
         title: Optional[str],
         price_value: Optional[float],
-        price_currency: Optional[str],
         country: Optional[str],
         volume_l: Optional[float],
         abv_percent: Optional[float],
         age_years: Optional[int],
         brand: Optional[str],
         producer: Optional[str],
-        sku: Optional[str],
         tasting_notes: Optional[str],
         gastronomy: Optional[str],
         grapes: List[str],
         maturation: Optional[str],
-        awards: Optional[str],
         gift_packaging: Optional[str],
-        breadcrumbs: List[str],
         image_original_url: Optional[str],
         image_direct_url: Optional[str],
         image_viewer_url: Optional[str],
@@ -140,28 +138,20 @@ class SheetsWriter:
     ) -> SheetRecord:
         """Подготовить запись для Google Sheets."""
         values: Dict[str, Optional[str]] = {
-            "TIMESTAMP_UTC": self._utc_now(),
-            "SOURCE_CATEGORY_URL": category_url,
-            "PAGE_NUM": str(page_number) if page_number is not None else "",
             "PRODUCT_URL": product_url,
-            "PRODUCT_ID": product_id,
             "TITLE": title or "",
             "PRICE_VALUE": self._format_number(price_value),
-            "PRICE_CURRENCY": price_currency or "",
             "COUNTRY": country or "",
             "VOLUME_L": self._format_number(volume_l),
             "ABV_PERCENT": self._format_number(abv_percent),
             "AGE_YEARS": self._format_number(age_years),
             "BRAND": brand or "",
             "PRODUCER": producer or "",
-            "SKU": sku or "",
             "TASTING_NOTES": tasting_notes or "",
             "GASTRONOMY": gastronomy or "",
             "GRAPES_JSON": json.dumps(grapes, ensure_ascii=False),
             "MATURATION": maturation or "",
-            "AWARDS": awards or "",
             "GIFT_PACKAGING": gift_packaging or "",
-            "BREADCRUMBS": " > ".join(breadcrumbs),
             "IMAGE_ORIGINAL_URL": image_original_url or "",
             "IMAGE_DIRECT_URL": image_direct_url or "",
             "IMAGE_VIEWER_URL": image_viewer_url or "",
@@ -171,7 +161,7 @@ class SheetsWriter:
             "STATUS": status,
             "ERROR_MSG": error_msg or "",
         }
-        return SheetRecord(unique_key=product_id, values=values)
+        return SheetRecord(unique_key=product_url, values=values)
 
     def _ensure_header(self, worksheet) -> None:
         current_header = worksheet.row_values(1)
@@ -186,12 +176,16 @@ class SheetsWriter:
             )
         else:
             worksheet.append_row(SHEET_COLUMNS, value_input_option="RAW")
+        self._logger.info("Заголовок Google Sheets синхронизирован с текущей схемой.")
 
     def _find_row_index(self, worksheet, unique_key: str) -> Optional[int]:
-        product_id_col = SHEET_COLUMNS.index("PRODUCT_ID") + 1
+        product_id_col = SHEET_COLUMNS.index("PRODUCT_URL") + 1
         try:
             column_values = worksheet.col_values(product_id_col)
-        except gspread.exceptions.APIError:
+        except gspread.exceptions.APIError as exc:
+            self._logger.warning(
+                "Не удалось получить столбец PRODUCT_URL из Sheets: %s", exc
+            )
             return None
 
         for index, value in enumerate(column_values[1:], start=2):
@@ -210,6 +204,7 @@ class SheetsWriter:
             return self._worksheet
         client = await self._get_client()
         if client is None:
+            self._logger.warning("Клиент Google Sheets недоступен, worksheet не получен.")
             return None
         try:
             spreadsheet = await asyncio.to_thread(
@@ -218,7 +213,13 @@ class SheetsWriter:
             self._worksheet = await asyncio.to_thread(
                 spreadsheet.worksheet, self._settings.gsheet_tab
             )
-        except (WorksheetNotFound, gspread.SpreadsheetNotFound, gspread.exceptions.APIError):
+            self._logger.info(
+                "Получен worksheet %s из таблицы %s",
+                self._settings.gsheet_tab,
+                self._settings.gsheet_id,
+            )
+        except (WorksheetNotFound, gspread.SpreadsheetNotFound, gspread.exceptions.APIError) as exc:
+            self._logger.warning("Не удалось открыть лист Google Sheets: %s", exc)
             return None
         return self._worksheet
 
@@ -228,16 +229,22 @@ class SheetsWriter:
         try:
             credentials = await asyncio.to_thread(self._load_credentials)
             if credentials is None:
+                self._logger.warning("Не удалось загрузить креды сервисного аккаунта.")
                 return None
             self._client = await asyncio.to_thread(
                 gspread.authorize,
                 credentials,
             )
-        except (OSError, ValueError, gspread.exceptions.APIError):
+            self._logger.info("Авторизация в Google Sheets выполнена успешно.")
+        except (OSError, ValueError, gspread.exceptions.APIError) as exc:
+            self._logger.warning("Авторизация Google Sheets не удалась: %s", exc)
             return None
         return self._client
 
     def _load_credentials(self):
+        self._logger.debug(
+            "Чтение файла сервисного аккаунта: %s", self._settings.google_sa_json
+        )
         return service_account.Credentials.from_service_account_file(
             self._settings.google_sa_json,
             scopes=SHEETS_SCOPES,
@@ -246,12 +253,15 @@ class SheetsWriter:
     def _is_enabled(self) -> bool:
         if not self._settings.gsheet_id or not self._settings.google_sa_json:
             return False
-        return Path(self._settings.google_sa_json).exists()
+        enabled = Path(self._settings.google_sa_json).exists()
+        if not enabled:
+            self._logger.warning(
+                "Файл сервисного аккаунта не найден по пути %s",
+                self._settings.google_sa_json,
+            )
+        return enabled
 
     def _format_number(self, value: Optional[float]) -> str:
         if value is None:
             return ""
         return f"{value:.2f}".rstrip("0").rstrip(".")
-
-    def _utc_now(self) -> str:
-        return datetime.now(timezone.utc).isoformat()

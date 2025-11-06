@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import deque
+import logging
 from dataclasses import dataclass
 from typing import AsyncIterator, Deque, List, Optional, Set
 from urllib.parse import parse_qs, urljoin, urlparse
@@ -15,6 +16,8 @@ from app.playwright_helpers import close_age_confirmation
 
 PRODUCT_LINK_SELECTOR = "a[href^='/katalog/tovar/']"
 PAGINATION_LINK_SELECTOR = "a[href*='PAGEN_1=']"
+
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -52,6 +55,7 @@ class CategoryCrawler:
                 if target_url in visited:
                     continue
 
+                LOGGER.info("Краулер: переход на страницу %s", target_url)
                 await page.goto(
                     target_url,
                     wait_until="networkidle",
@@ -114,12 +118,14 @@ class CategoryCrawler:
         )
         links: List[ProductLink] = []
         seen: Set[str] = set()
+        duplicates: List[str] = []
 
         for position, raw_href in enumerate(hrefs, start=1):
             if not raw_href:
                 continue
             absolute_url = urljoin(page.url, raw_href)
             if absolute_url in seen:
+                duplicates.append(absolute_url)
                 continue
             seen.add(absolute_url)
             links.append(
@@ -129,6 +135,16 @@ class CategoryCrawler:
                     page_number=page_number,
                     position=position,
                 )
+            )
+        duplicates_count = len(duplicates)
+        if duplicates_count:
+            sample = ", ".join(sorted(set(duplicates))[:3])
+            LOGGER.info(
+                "Краулер: на странице %s (%s) отфильтровано %s дубликатов, примеры: %s",
+                page_number if page_number is not None else "N/A",
+                page.url,
+                duplicates_count,
+                sample,
             )
         return links
 

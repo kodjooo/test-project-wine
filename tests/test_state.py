@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sqlite3
+
 from pathlib import Path
 
 from app.state import StateRepository
@@ -43,3 +45,38 @@ def test_state_repository_upsert_and_retrieve(tmp_path) -> None:
 
     repo.close()
     assert Path(db_path).exists()
+
+
+def test_state_repository_migrates_legacy_schema(tmp_path) -> None:
+    db_path = tmp_path / "legacy.db"
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            """
+            CREATE TABLE image_hashes (
+                sha256 TEXT PRIMARY KEY,
+                drive_file_id TEXT,
+                public_url TEXT,
+                original_url TEXT,
+                updated_at TEXT
+            )
+        """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    repo = StateRepository(db_path)
+    sha256 = "legacysha"
+    repo.save_image(
+        sha256,
+        "https://cdn.direct/legacy",
+        "https://viewer/legacy",
+        "https://thumb/legacy",
+        "https://origin/legacy",
+    )
+
+    record = repo.get_image(sha256)
+    assert record is not None
+    assert record.direct_url == "https://cdn.direct/legacy"
+    repo.close()

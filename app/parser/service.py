@@ -60,6 +60,7 @@ class ProductPageParser:
         page = await context.new_page()
 
         try:
+            LOGGER.info("Загрузка страницы товара: %s", link.url)
             await page.goto(
                 link.url,
                 wait_until="networkidle",
@@ -71,6 +72,7 @@ class ProductPageParser:
 
             product = self._parse_html(html, link)
             self.metrics.products_parsed += 1
+            LOGGER.info("Страница товара загружена и распарсена: %s", link.url)
             return product
         except Exception:
             self.metrics.failures += 1

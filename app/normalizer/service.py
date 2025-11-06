@@ -17,6 +17,13 @@ LOGGER = logging.getLogger(__name__)
 AGE_REGEX = re.compile(r"(\d{1,3})\s*(?:yo|y\.o\.|год(?:а|ов)?|лет)", re.IGNORECASE)
 
 
+def raw_value_preview(data: object, max_length: int = 60) -> str:
+    """Подготовить укороченное представление значения для логов."""
+    text = str(data)
+    if len(text) > max_length:
+        return f"{text[:max_length]}…"
+    return text
+
 @dataclass(slots=True)
 class NormalizerMetrics:
     """Статистика по нормализации карточек."""
@@ -234,11 +241,17 @@ class ProductNormalizer:
             return None
         try:
             if mode == "price":
+                LOGGER.info("LLM нормализация цены для %s", raw_value_preview(data))
                 payload = await self._llm_client.normalize_price(str(data))
             elif mode == "volume_abv":
+                LOGGER.info("LLM извлечение объёма/крепости для %s", raw_value_preview(data))
                 payload = await self._llm_client.parse_volume_abv(str(data))
             elif mode == "section":
                 assert isinstance(data, dict)
+                LOGGER.info(
+                    "LLM обработка секции '%s' для продукта",
+                    data.get("title", ""),
+                )
                 payload = await self._llm_client.extract_section(
                     section=str(data.get("title", "")),
                     html=str(data.get("html", "")),
@@ -249,7 +262,7 @@ class ProductNormalizer:
             return payload
         except LLMUnavailableError as exc:
             self.metrics.llm_failures += 1
-            LOGGER.debug("LLM недоступен (%s): %s", mode, exc)
+            LOGGER.warning("LLM недоступен (%s): %s", mode, exc)
             return None
 
     def _safe_float(self, value: object) -> Optional[float]:

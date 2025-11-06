@@ -26,7 +26,7 @@ D. Media Uploader
   • Возвращает direct url, viewer url и thumb url, кеширует связку SHA‑256 → ссылки в SQLite.
 
 E. Sheets Writer
-  • Upsert по уникальному ключу (PRODUCT_ID, если есть; иначе хэш PRODUCT_URL).
+  • Upsert по PRODUCT_URL (однозначная ссылка на карточку).
   • Вставляет строку; в колонку IMAGE_CELL пишет формулу =IMAGE(IMAGE_DIRECT_URL).
   • При повторном запуске обновляет только изменившиеся поля; изображение не перезагружает, если хэш не изменился.
 
@@ -86,8 +86,7 @@ config.json (пример — при необходимости подправи
     "image_selector": ".product img, .gallery img, img[src*='/upload/']"
   },
   "upsert": {
-    "unique_key": "PRODUCT_ID",
-    "fallback_unique_key": "PRODUCT_URL"
+    "unique_key": "PRODUCT_URL"
   },
   "llm": {
     "enabled": true,
@@ -102,14 +101,12 @@ config.json (пример — при необходимости подправи
 }
 
 5) Поля для Google Sheets (лист GSHEET_TAB)
-TIMESTAMP_UTC, SOURCE_CATEGORY_URL, PAGE_NUM, PRODUCT_URL, PRODUCT_ID, TITLE, PRICE_VALUE, PRICE_CURRENCY,
-COUNTRY, VOLUME_L, ABV_PERCENT, AGE_YEARS, BRAND, PRODUCER, SKU,
-TASTING_NOTES, GASTRONOMY, GRAPES_JSON, MATURATION, AWARDS, GIFT_PACKAGING,
-BREADCRUMBS, IMAGE_ORIGINAL_URL, IMAGE_DIRECT_URL, IMAGE_VIEWER_URL, IMAGE_THUMB_URL, IMAGE_SHA256, IMAGE_CELL, STATUS, ERROR_MSG.
+PRODUCT_URL, TITLE, PRICE_VALUE,
+COUNTRY, VOLUME_L, ABV_PERCENT, AGE_YEARS, BRAND, PRODUCER,
+TASTING_NOTES, GASTRONOMY, GRAPES_JSON, MATURATION, GIFT_PACKAGING,
+IMAGE_ORIGINAL_URL, IMAGE_DIRECT_URL, IMAGE_VIEWER_URL, IMAGE_THUMB_URL, IMAGE_SHA256, IMAGE_CELL, STATUS, ERROR_MSG.
 
 Правила:
-— PRODUCT_ID: если на странице нет явного SKU/ID, используем sha256(PRODUCT_URL).
-— PRICE_CURRENCY всегда «RUB» (если не найдено иного).
 — GRAPES_JSON: массив строк (JSON), например ["Уни Блан","Коломбар"].
 — IMAGE_CELL: формула вида =IMAGE(IMAGE_DIRECT_URL).
 
@@ -121,7 +118,7 @@ BREADCRUMBS, IMAGE_ORIGINAL_URL, IMAGE_DIRECT_URL, IMAGE_VIEWER_URL, IMAGE_THUMB
    3.2. Спарсить: TITLE, SKU (регекс «Артикул: (.+)»), COUNTRY (ссылка около заголовка/хлебные крошки), VOLUME_L/ABV_PERCENT (по селекторам или LLM из «инфо‑плашки»), PRICE_VALUE/PRICE_CURRENCY, AVAILABILITY («в наличии» → true), BRAND/PRODUCER (блок «Производитель» и/или ссылочные элементы рядом с h1), AGE_YEARS (эвристика/LLM по заголовку или «Способ выдержки»), разделы (tasting_notes, gastronomy, grapes → список, maturation, awards, gift_packaging).
    3.3. Найти главное изображение: image_selector → первая подходящая <img>. Получить абсолютный URL (учесть data-src/srcset). При необходимости скачать и посчитать SHA‑256; если уже есть такой хэш — переиспользовать прежние ссылки FreeImage.host.
    3.4. Загрузить изображение на FreeImage.host (сначала передав исходный URL, при ошибке — бинарный файл) и получить прямую ссылку.
-   3.5. Подготовить запись для Sheets. Upsert по PRODUCT_ID (или хэш URL). IMAGE_CELL = =IMAGE(IMAGE_DIRECT_URL). STATUS = new | updated.
+   3.5. Подготовить запись для Sheets. Upsert по PRODUCT_URL. IMAGE_CELL = =IMAGE(IMAGE_DIRECT_URL). STATUS = new | updated.
 4. Пагинация: находить ссылки на страницы (page_link_selector). Для текущей страницы определить «следующую» как ближайшее число > текущего; если нет — завершить.
 5. Итог: вывести отчёт (pages, products_total, inserted, updated, errors).
 
