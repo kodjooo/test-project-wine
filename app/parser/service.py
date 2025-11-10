@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
+import asyncio
 from typing import Dict, List, Optional
 from urllib.parse import urljoin
 
@@ -63,32 +64,51 @@ class ProductPageParser:
 
     async def parse(self, context: BrowserContext, link: ProductLink) -> ProductRaw:
         """Загрузить страницу и вернуть сырые данные карточки."""
-        page = await context.new_page()
-
-        try:
-            LOGGER.info("Загрузка страницы товара: %s", link.url)
-            await page.goto(
-                link.url,
-                wait_until="networkidle",
-                timeout=self._settings.navigation_timeout_ms,
-            )
-            await close_age_confirmation(page)
-            await page.wait_for_selector("h1", timeout=self._settings.navigation_timeout_ms)
-            html = await page.content()
-
-            product = self._parse_html(html, link)
-            self.metrics.products_parsed += 1
-            LOGGER.info("Страница товара загружена и распарсена: %s", link.url)
-            return product
-        except Exception:
-            self.metrics.failures += 1
-            LOGGER.exception("Failed to parse product page: %s", link.url)
-            raise
-        finally:
+        attempts_left = self._settings.max_retries + 1
+        last_error: Optional[Exception] = None
+        while attempts_left:
+            page = await context.new_page()
             try:
-                await page.wait_for_timeout(self._settings.request_delay_ms)
+                LOGGER.info(
+                    "Загрузка страницы товара: %s (попытка %s)",
+                    link.url,
+                    (self._settings.max_retries + 2) - attempts_left,
+                )
+                await page.goto(
+                    link.url,
+                    wait_until="networkidle",
+                    timeout=self._settings.navigation_timeout_ms,
+                )
+                await close_age_confirmation(page)
+                await page.wait_for_selector(
+                    "h1", timeout=self._settings.navigation_timeout_ms
+                )
+                html = await page.content()
+
+                product = self._parse_html(html, link)
+                self.metrics.products_parsed += 1
+                LOGGER.info("Страница товара загружена и распарсена: %s", link.url)
+                return product
+            except Exception as exc:
+                last_error = exc
+                attempts_left -= 1
+                self.metrics.failures += 1
+                LOGGER.warning(
+                    "Ошибка при парсинге %s (осталось попыток: %s): %s",
+                    link.url,
+                    attempts_left,
+                    exc,
+                )
+                if attempts_left > 0:
+                    await asyncio.sleep(self._settings.request_delay_ms / 1000)
+                else:
+                    LOGGER.exception("Failed to parse product page: %s", link.url)
+                    raise
             finally:
-                await page.close()
+                try:
+                    await page.wait_for_timeout(self._settings.request_delay_ms)
+                finally:
+                    await page.close()
 
     def _parse_html(self, html: str, link: ProductLink) -> ProductRaw:
         tree = HTMLParser(html)
