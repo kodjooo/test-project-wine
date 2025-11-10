@@ -16,7 +16,7 @@
 ## Подготовка окружения
 
 1. Скопируйте `.env.example` в `.env` и заполните значения:
-   - `CATEGORY_URL` — стартовая категория.
+   - `CATEGORY_URL` — стартовая категория (если категорий несколько, используйте `CATEGORY_URLS`, перечислив URL через запятую или с новой строки).
    - `GSHEET_ID`, `GSHEET_TAB` — таблица и лист для выгрузки.
    - `GOOGLE_SA_JSON` — путь к JSON сервисного аккаунта (файл поместить в `./secrets/sa.json`).
    - `FREEIMAGE_API_KEY` + таймауты — параметры доступа к FreeImage.host (ключ выдаёт администратор аккаунта).
@@ -84,7 +84,7 @@ docker compose run --rm scraper pytest
    cp .env.example .env
    ```
    Заполните `.env`:
-   - `CATEGORY_URL` — актуальный URL категории.
+   - `CATEGORY_URL` или `CATEGORY_URLS` — один или несколько URL категорий (для нескольких перечислите через запятую/с новой строки).
    - `GSHEET_ID`, `GSHEET_TAB`, `GOOGLE_SA_JSON` — доступ к Google Sheets.
    - `FREEIMAGE_API_KEY` — ключ FreeImage.host; при необходимости измените таймауты/endpoint.
    - При использовании прокси заполните `USE_PROXY` и URL.

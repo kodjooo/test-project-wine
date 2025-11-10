@@ -36,6 +36,7 @@ class CategoryCrawler:
         self._settings = settings
         self.metrics = CategoryCrawlerMetrics()
         self._unique_product_urls: Set[str] = set()
+        self._start_urls = settings.category_urls()
 
     async def crawl(self, context: BrowserContext) -> AsyncIterator[CategoryPageResult]:
         """Асинхронно обойти все доступные страницы и вернуть результаты."""
@@ -43,8 +44,9 @@ class CategoryCrawler:
         visited: Set[str] = set()
         queued: Set[str] = set()
         queue: Deque[str] = deque()
-        queue.append(self._settings.category_url)
-        queued.add(self._settings.category_url)
+        for url in self._start_urls:
+            queue.append(url)
+            queued.add(url)
         fallback_page_counter = 0
 
         try:

@@ -7,7 +7,7 @@
 
 3) Роли и компоненты
 A. Crawler (обход списка)
-  • Загружает начальную категорию, собирает ссылки карточек (href вида /katalog/tovar/..).
+  • Загружает одну или несколько категорий (перечислены в `CATEGORY_URLS` или одиночный `CATEGORY_URL`), собирает ссылки карточек (href вида /katalog/tovar/..).
   • Пагинация: если есть ссылки на «2», «3», … — проходить по ним. Паттерн URL может быть вида ?PAGEN_1=2&PARAM=…; шаблон следующей страницы брать из href первой найденной ссылки на следующую страницу.
   • Ограничение частоты запросов (REQUEST_DELAY_MS), ретраи (tenacity), User‑Agent ротация, опционально прокси.
 
@@ -39,6 +39,8 @@ G. Telemetry
 4) Конфигурация (ENV + JSON)
 .env
   CATEGORY_URL=https://winediscovery.ru/katalog/krepkie_napitki/filtr/drinktype-konyak/
+  # или перечислите несколько категорий:
+  # CATEGORY_URLS=https://site/category1/,https://site/category2/
   GSHEET_ID=1...your...
   GSHEET_TAB=Products
   GOOGLE_SA_JSON=/secrets/sa.json

@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     )
 
     category_url: str = Field(default=DEFAULT_CATEGORY_URL, alias="CATEGORY_URL")
+    category_urls_raw: str = Field(default="", alias="CATEGORY_URLS")
     gsheet_id: str = Field(default="", alias="GSHEET_ID")
     gsheet_tab: str = Field(default="Products", alias="GSHEET_TAB")
     google_sa_json: str = Field(default="/secrets/sa.json", alias="GOOGLE_SA_JSON")
@@ -67,6 +68,24 @@ class Settings(BaseSettings):
     def choice_user_agent(self) -> str:
         """Вернуть случайный User-Agent из пула."""
         return random.choice(USER_AGENT_POOL)
+
+    def category_urls(self) -> List[str]:
+        """Список стартовых URL категорий (из CATEGORY_URLS или одиночного CATEGORY_URL)."""
+        if self.category_urls_raw:
+            raw_items = [
+                item.strip()
+                for item in self.category_urls_raw.replace("\r", "").split("\n")
+            ]
+            urls: List[str] = []
+            for item in raw_items:
+                if not item:
+                    continue
+                parts = [part.strip() for part in item.split(",") if part.strip()]
+                if parts:
+                    urls.extend(parts)
+            if urls:
+                return urls
+        return [self.category_url]
 
 
 @lru_cache(maxsize=1)
